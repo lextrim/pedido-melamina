@@ -567,74 +567,145 @@ function copiar() {
   });
 }
 
-// ── PDF ──
-function abrirPDF() {
+// ── PDF con jsPDF ──
+async function abrirPDF() {
+  const btn = document.querySelector('[onclick="abrirPDF()"]');
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Generando PDF...';
+  btn.disabled = true;
+
+  // Cargar jsPDF si no está
+  if (!window.jspdf) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  const { jsPDF } = window.jspdf;
   const ref = document.getElementById('referencia').value.trim();
   const col = colorMel;
   const data = calcData();
   const { fondos, trasCc, trasC } = agrupar(data);
   const sort = obj => Object.keys(obj).sort((a,b) => parseFloat(a) - parseFloat(b));
 
-  let tablas = `<div class="sec green">Fondos</div>
-<table><thead><tr><th>Cant.</th><th>Ancho (cm)</th><th>Fondo</th></tr></thead><tbody>`;
-  sort(fondos).forEach(k => { tablas += `<tr><td>${fondos[k]}</td><td>${fmt(parseFloat(k))}</td><td>${fmt(FONDO_BASE)}</td></tr>`; });
-  tablas += `</tbody></table>`;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, ML = 18, MR = 18, TW = W - ML - MR; // ancho útil
+  let y = 18;
 
+  // ── Título ──
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(42, 107, 74);
+  doc.text('PEDIDO MELAMINA DE CAJONES', ML, y);
+  y += 1;
+  doc.setDrawColor(42, 107, 74);
+  doc.setLineWidth(0.6);
+  doc.line(ML, y + 1, W - MR, y + 1);
+  y += 7;
+
+  // ── Meta ──
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(160, 160, 160);
+  const cols = ['REFERENCIA', 'FECHA', 'COLOR', 'GROSOR'];
+  const vals = [ref, today(), col, grosor + ' mm'];
+  const cw = TW / 4;
+  cols.forEach((c, i) => doc.text(c, ML + i * cw, y));
+  y += 4;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(20, 20, 20);
+  vals.forEach((v, i) => doc.text(v, ML + i * cw, y));
+  y += 10;
+
+  // ── Función tabla ──
+  function drawTable(titulo, colorBg, filas, cols3) {
+    // Cabecera sección
+    doc.setFillColor(...colorBg);
+    doc.rect(ML, y, TW, 6, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    doc.text(titulo.toUpperCase(), ML + 3, y + 4.2);
+    y += 6;
+
+    // Cabecera columnas
+    const cws = [22, 60, 50]; // anchos col
+    doc.setFillColor(240, 240, 236);
+    doc.rect(ML, y, TW, 6, 'F');
+    doc.setFontSize(7.5);
+    doc.setTextColor(120, 120, 120);
+    doc.setFont('helvetica', 'bold');
+    let x = ML;
+    cols3.forEach((c, i) => { doc.text(c, x + 2, y + 4.2); x += cws[i]; });
+    doc.setDrawColor(200, 200, 196);
+    doc.setLineWidth(0.3);
+    doc.line(ML, y + 6, ML + TW, y + 6);
+    y += 6;
+
+    // Filas
+    filas.forEach((fila, ri) => {
+      if (ri % 2 === 1) { doc.setFillColor(247, 247, 244); doc.rect(ML, y, TW, 7, 'F'); }
+      doc.setFontSize(10);
+      doc.setTextColor(20, 20, 20);
+      doc.setFont('helvetica', 'bold');
+      let x = ML;
+      fila.forEach((v, i) => {
+        if (i === 0) doc.setFont('helvetica', 'bold');
+        else doc.setFont('helvetica', 'normal');
+        doc.text(String(v), x + 2, y + 4.8);
+        x += cws[i];
+      });
+      doc.setDrawColor(220, 220, 216);
+      doc.setLineWidth(0.2);
+      doc.line(ML, y + 7, ML + TW, y + 7);
+      y += 7;
+    });
+
+    // Borde exterior tabla
+    doc.setDrawColor(180, 180, 176);
+    doc.setLineWidth(0.3);
+    doc.rect(ML, y - 6 * (filas.length + 1) - 6, TW, 6 * (filas.length + 1) + 6 + 1, 'S');
+    y += 6;
+  }
+
+  // Fondos
+  const filasFondos = sort(fondos).map(k => [fondos[k], fmt(parseFloat(k)) + ' cm', fmt(FONDO_BASE)]);
+  drawTable('Fondos', [42, 107, 74], filasFondos, ['CANT.', 'ANCHO (CM)', 'FONDO']);
+
+  // Traseras CC
   if (sort(trasCc).length) {
-    tablas += `<div class="sec blue">Traseras CC</div>
-<table><thead><tr><th>Cant.</th><th>Ancho (cm)</th><th>Altura</th></tr></thead><tbody>`;
-    sort(trasCc).forEach(k => { tablas += `<tr><td>${trasCc[k]}</td><td>${fmt(parseFloat(k))}</td><td>${fmt(ALTURA_CC)}</td></tr>`; });
-    tablas += `</tbody></table>`;
+    const filas = sort(trasCc).map(k => [trasCc[k], fmt(parseFloat(k)) + ' cm', fmt(ALTURA_CC)]);
+    drawTable('Traseras CC', [26, 74, 122], filas, ['CANT.', 'ANCHO (CM)', 'ALTURA']);
   }
 
+  // Traseras C
   if (sort(trasC).length) {
-    tablas += `<div class="sec brown">Traseras C</div>
-<table><thead><tr><th>Cant.</th><th>Ancho (cm)</th><th>Altura</th></tr></thead><tbody>`;
-    sort(trasC).forEach(k => { tablas += `<tr><td>${trasC[k]}</td><td>${fmt(parseFloat(k))}</td><td>${fmt(ALTURA_C)}</td></tr>`; });
-    tablas += `</tbody></table>`;
+    const filas = sort(trasC).map(k => [trasC[k], fmt(parseFloat(k)) + ' cm', fmt(ALTURA_C)]);
+    drawTable('Traseras C', [122, 58, 26], filas, ['CANT.', 'ANCHO (CM)', 'ALTURA']);
   }
 
-  const html = `<!doctype html><html lang="es"><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pedido ${ref}</title>
-<style>
-  @page { size: A4; margin: 16mm 18mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #1a1a1a; }
-  .wrap { max-width: 520px; }
-  h1 { font-size: 13pt; text-transform: uppercase; letter-spacing: .07em; color: #2a6b4a; padding-bottom: 7px; border-bottom: 2.5px solid #2a6b4a; margin-bottom: 12px; }
-  .meta { display: flex; gap: 24px; margin-bottom: 16px; flex-wrap: wrap; }
-  .meta-item { display: flex; flex-direction: column; gap: 2px; }
-  .meta-lbl { font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #999; }
-  .meta-val { font-size: 10pt; font-weight: 700; color: #111; }
-  .sec { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #fff; padding: 4px 10px; margin-top: 12px; margin-bottom: 0; display: block; }
-  .green { background: #2a6b4a; }
-  .blue  { background: #1a4a7a; }
-  .brown { background: #7a3a1a; }
-  table { border-collapse: collapse; }
-  th { background: #f0f0ec; font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #777; padding: 4px 12px; text-align: left; border: 1px solid #d0d0cc; }
-  td { padding: 5px 12px; font-size: 10pt; border: 1px solid #ddddd8; }
-  td:first-child { font-weight: 700; width: 52px; }
-  td:nth-child(2) { width: 100px; }
-  td:nth-child(3) { width: 80px; color: #444; }
-  tr:nth-child(even) td { background: #f7f7f4; }
-  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-</style></head><body>
-<div class="wrap">
-  <h1>Pedido Melamina de Cajones</h1>
-  <div class="meta">
-    <div class="meta-item"><span class="meta-lbl">Referencia</span><span class="meta-val">${ref}</span></div>
-    <div class="meta-item"><span class="meta-lbl">Fecha</span><span class="meta-val">${today()}</span></div>
-    <div class="meta-item"><span class="meta-lbl">Color</span><span class="meta-val">${col}</span></div>
-    <div class="meta-item"><span class="meta-lbl">Grosor</span><span class="meta-val">${grosor} mm</span></div>
-  </div>
-  ${tablas}
-</div>
-</body></html>`;
+  // ── Compartir o descargar ──
+  const nombre = `Pedido_${ref}_${today().replace(/\//g,'-')}.pdf`;
+  const pdfBlob = doc.output('blob');
 
-  const blob = new Blob([html], { type: 'text/html' });
-  window.open(URL.createObjectURL(blob), '_blank');
+  btn.textContent = orig;
+  btn.disabled = false;
+
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], nombre, { type: 'application/pdf' })] })) {
+    const file = new File([pdfBlob], nombre, { type: 'application/pdf' });
+    navigator.share({ files: [file], title: 'Pedido Melamina - ' + ref });
+  } else {
+    // Fallback: descarga directa
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = nombre;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  }
 }
 
 // ── Reset ──
