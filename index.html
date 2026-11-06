@@ -262,32 +262,6 @@ td.qty-cc       { color: var(--cc); }
 td.qty-c        { color: var(--c); }
 tr:nth-child(even) td { background: var(--surface2); }
 
-/* ── Texto copia ── */
-.copy-box {
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-radius: var(--r);
-  padding: 14px;
-  margin-bottom: 10px;
-}
-.copy-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--fg3); margin-bottom: 8px; }
-.copy-txt {
-  font-family: 'Courier New', monospace;
-  font-size: 12px; line-height: 1.65; color: var(--fg2);
-  white-space: pre; overflow-x: auto;
-  padding: 10px; background: var(--surface2);
-  border-radius: var(--rs); margin-bottom: 10px;
-  -webkit-overflow-scrolling: touch;
-}
-.btn-copy {
-  width: 100%; padding: 13px;
-  background: var(--surface2); color: var(--fg);
-  border: 1.5px solid var(--border); border-radius: var(--rs);
-  font-family: inherit; font-size: 14px; font-weight: 600;
-  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-  transition: all .15s;
-}
-.btn-copy.ok { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
 
 /* ── Empty ── */
 .empty { text-align: center; padding: 36px 16px; color: var(--fg3); font-size: 14px; }
@@ -359,12 +333,6 @@ tr:nth-child(even) td { background: var(--surface2); }
     <p class="step-sub">Revisa y comparte</p>
 
     <div id="resultContent"></div>
-
-    <div class="copy-box">
-      <div class="copy-lbl">Texto para copiar / enviar</div>
-      <div class="copy-txt" id="txtCopia"></div>
-      <button class="btn-copy" id="btnCopy" onclick="copiar()">📋 Copiar texto</button>
-    </div>
 
     <button class="btn-sec" onclick="ir(2)">← Editar cascos</button>
     <button class="btn-sec" onclick="abrirPDF()" style="margin-top:8px">🖨️ Abrir para guardar PDF</button>
@@ -542,29 +510,6 @@ function buildResult() {
 
   document.getElementById('resultContent').innerHTML = html;
 
-  // Texto plano
-  const ref2 = document.getElementById('referencia').value.trim();
-  let txt = `PEDIDO MELAMINA DE CAJONES\n${'─'.repeat(28)}\n`;
-  txt += `Ref.:   ${ref2}\nFecha:  ${today()}\nColor:  ${col}\nGrosor: ${grosor}mm\n\nFONDOS\n`;
-  sort(fondos).forEach(k => { txt += `  ${fondos[k]}x  ${fmt(parseFloat(k))} cm  ×  ${fmt(FONDO_BASE)}\n`; });
-  if (sort(trasCc).length) { txt += `\nTRASERAS CC\n`; sort(trasCc).forEach(k => { txt += `  ${trasCc[k]}x  ${fmt(parseFloat(k))} cm  ×  ${fmt(ALTURA_CC)}\n`; }); }
-  if (sort(trasC).length)  { txt += `\nTRASERAS C\n`;  sort(trasC).forEach(k  => { txt += `${trasC[k]}x  ${fmt(parseFloat(k))} cm  ×  ${fmt(ALTURA_C)}\n`;  }); }
-  document.getElementById('txtCopia').textContent = txt;
-}
-
-// ── Copiar ──
-function copiar() {
-  const txt = document.getElementById('txtCopia').textContent;
-  const btn = document.getElementById('btnCopy');
-  navigator.clipboard?.writeText(txt).then(() => {
-    btn.textContent = '✓ Copiado'; btn.classList.add('ok');
-    setTimeout(() => { btn.innerHTML = '📋 Copiar texto'; btn.classList.remove('ok'); }, 2500);
-  }).catch(() => {
-    const r = document.createRange();
-    r.selectNodeContents(document.getElementById('txtCopia'));
-    getSelection().removeAllRanges(); getSelection().addRange(r);
-    btn.textContent = 'Selecciona y copia'; btn.classList.add('ok');
-  });
 }
 
 // ── PDF con jsPDF ──
