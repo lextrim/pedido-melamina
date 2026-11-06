@@ -688,22 +688,63 @@ async function abrirPDF() {
     drawTable('Traseras C', [122, 58, 26], filas, ['CANT.', 'ANCHO (CM)', 'ALTURA']);
   }
 
-  // ── Compartir o descargar ──
+  // ── Abrir PDF + botón compartir ──
   const nombre = `Pedido_${ref}_${today().replace(/\//g,'-')}.pdf`;
   const pdfBlob = doc.output('blob');
+  const pdfUrl = URL.createObjectURL(pdfBlob);
 
   btn.textContent = orig;
   btn.disabled = false;
 
-  if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], nombre, { type: 'application/pdf' })] })) {
-    const file = new File([pdfBlob], nombre, { type: 'application/pdf' });
-    navigator.share({ files: [file], title: 'Pedido Melamina - ' + ref });
+  // Abrir en nueva pestaña para previsualizar
+  const ventana = window.open(pdfUrl, '_blank');
+
+  // Mostrar botón flotante de compartir en la app
+  mostrarBtnCompartir(pdfBlob, nombre, ref);
+}
+
+function mostrarBtnCompartir(blob, nombre, ref) {
+  // Eliminar si ya existe
+  document.getElementById('shareBar')?.remove();
+
+  const bar = document.createElement('div');
+  bar.id = 'shareBar';
+  bar.style.cssText = `
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #2a6b4a; color: #fff;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    display: flex; gap: 10px; align-items: center;
+    z-index: 100; box-shadow: 0 -2px 12px rgba(0,0,0,0.2);
+  `;
+  bar.innerHTML = `
+    <button onclick="compartirPDF()" style="flex:1;padding:12px;background:#fff;color:#2a6b4a;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">
+      📤 Compartir PDF
+    </button>
+    <button onclick="document.getElementById('shareBar').remove()" style="padding:12px 14px;background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:10px;font-size:15px;cursor:pointer;">
+      ✕
+    </button>
+  `;
+  document.body.appendChild(bar);
+
+  // Guardar blob para compartir
+  window._pdfBlob = blob;
+  window._pdfNombre = nombre;
+  window._pdfRef = ref;
+}
+
+async function compartirPDF() {
+  const blob = window._pdfBlob;
+  const nombre = window._pdfNombre;
+  const ref = window._pdfRef;
+  if (!blob) return;
+
+  if (navigator.share && navigator.canShare?.({ files: [new File([blob], nombre, { type: 'application/pdf' })] })) {
+    const file = new File([blob], nombre, { type: 'application/pdf' });
+    await navigator.share({ files: [file], title: 'Pedido Melamina - ' + ref });
   } else {
-    // Fallback: descarga directa
-    const url = URL.createObjectURL(pdfBlob);
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = nombre;
-    a.click();
+    a.href = url; a.download = nombre; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
   }
 }
